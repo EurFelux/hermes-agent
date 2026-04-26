@@ -20,6 +20,7 @@ import os
 from typing import Optional
 
 from tools.registry import registry, tool_error  # noqa: F401 — tool_error used by Tasks 6-10
+from gateway.platforms.base import cache_image_from_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -319,4 +320,121 @@ registry.register(
     handler=remove_from_library_handler,
     is_async=True,
     emoji="🗑️",
+)
+
+# --------- add_set_to_library ---------
+
+ADD_SET_SCHEMA = {
+    "name": "add_set_to_library",
+    "description": (
+        "Add an entire Telegram sticker pack to your library. Use this when the "
+        "user asks you to remember a whole pack (e.g. 'add MyKawaiiPack to your "
+        "stickers'). All static stickers in the pack are analyzed and added; "
+        "animated and video stickers are skipped (they can't be vision-described). "
+        "usage_notes start empty for each."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "set_name": {
+                "type": "string",
+                "description": "Telegram sticker set name (e.g. 'MyKawaiiPack').",
+            },
+        },
+        "required": ["set_name"],
+    },
+}
+
+
+async def add_set_to_library_handler(args: dict, **_) -> str:
+    set_name = args.get("set_name", "")
+    if not set_name:
+        return _err("set_name is required")
+
+    from gateway.sticker_cache import (
+        get_cached_description,
+        cache_sticker_description,
+        STICKER_VISION_PROMPT,
+    )
+    from gateway.sticker_library import add_sticker
+
+    try:
+        bot = _build_bot()
+    except RuntimeError as e:
+        return _err(str(e))
+
+    from telegram.error import BadRequest
+    try:
+        sticker_set = await bot.get_sticker_set(set_name)
+    except BadRequest as e:
+        return _err(f"Telegram couldn't find sticker set {set_name!r}: {e}")
+    except Exception as e:
+        return _err(f"Failed to fetch sticker set: {e}")
+
+    added = 0
+    skipped = 0
+    skipped_reasons = []
+
+    for sticker in sticker_set.stickers:
+        # Skip non-static formats: vision can't describe them.
+        if sticker.is_animated or sticker.is_video:
+            skipped += 1
+            skipped_reasons.append(f"{sticker.file_unique_id} (animated/video)")
+            continue
+
+        cached = get_cached_description(sticker.file_unique_id)
+        if cached and cached.get("description"):
+            description = cached["description"]
+            # If the legacy entry has no file_id, write the freshly-known one.
+            if not cached.get("file_id"):
+                cache_sticker_description(
+                    sticker.file_unique_id, description,
+                    cached.get("emoji", sticker.emoji or ""),
+                    cached.get("set_name", sticker.set_name or ""),
+                    file_id=sticker.file_id,
+                )
+        else:
+            # Cache miss: download + vision, then write cache.
+            try:
+                file_obj = await sticker.get_file()
+                image_bytes = await file_obj.download_as_bytearray()
+                cached_path = cache_image_from_bytes(bytes(image_bytes), ext=".webp")
+                from tools.vision_tools import vision_analyze_tool
+                result_json = await vision_analyze_tool(
+                    image_url=cached_path,
+                    user_prompt=STICKER_VISION_PROMPT,
+                )
+                vresult = json.loads(result_json)
+                if vresult.get("success"):
+                    description = vresult.get("analysis", "a sticker")
+                else:
+                    description = f"a sticker with emoji {sticker.emoji}" if sticker.emoji else "a sticker"
+            except Exception as e:
+                logger.warning("[Sticker] vision failed for %s: %s", sticker.file_unique_id, e)
+                description = f"a sticker with emoji {sticker.emoji}" if sticker.emoji else "a sticker"
+
+            cache_sticker_description(
+                sticker.file_unique_id, description,
+                emoji=sticker.emoji or "", set_name=sticker.set_name or "",
+                file_id=sticker.file_id,
+            )
+
+        add_sticker(sticker.file_unique_id, sticker.file_id, description, usage_notes="")
+        added += 1
+
+    return _ok({
+        "set_name": set_name,
+        "added": added,
+        "skipped": skipped,
+        "skipped_details": skipped_reasons,
+    })
+
+
+registry.register(
+    name="add_set_to_library",
+    toolset="messaging",
+    schema=ADD_SET_SCHEMA,
+    handler=add_set_to_library_handler,
+    is_async=True,
+    emoji="📦",
 )

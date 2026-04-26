@@ -229,3 +229,84 @@ async def test_remove_from_library_missing_is_success(patched_paths):
     from tools.sticker_tools import remove_from_library_handler
     result = json.loads(await remove_from_library_handler({"file_unique_id": "uid_nope"}))
     assert result["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_add_set_to_library_happy_path(patched_paths):
+    """A pack with two static stickers (one already cached, one new) is fully added."""
+    from gateway.sticker_cache import cache_sticker_description
+    # Pre-cache uid_known so vision should NOT be re-run for it
+    cache_sticker_description("uid_known", "A known cat", emoji="🐱", set_name="MyPack", file_id="F_KNOWN")
+
+    sticker_known = MagicMock()
+    sticker_known.file_unique_id = "uid_known"
+    sticker_known.file_id = "F_KNOWN"
+    sticker_known.emoji = "🐱"
+    sticker_known.set_name = "MyPack"
+    sticker_known.is_animated = False
+    sticker_known.is_video = False
+    sticker_known.get_file = AsyncMock()  # would be called only on cache miss
+
+    sticker_new = MagicMock()
+    sticker_new.file_unique_id = "uid_new"
+    sticker_new.file_id = "F_NEW"
+    sticker_new.emoji = "🐶"
+    sticker_new.set_name = "MyPack"
+    sticker_new.is_animated = False
+    sticker_new.is_video = False
+    new_file_obj = MagicMock()
+    new_file_obj.download_as_bytearray = AsyncMock(return_value=bytearray(b"bytes"))
+    sticker_new.get_file = AsyncMock(return_value=new_file_obj)
+
+    fake_set = MagicMock()
+    fake_set.stickers = [sticker_known, sticker_new]
+    fake_bot = MagicMock()
+    fake_bot.get_sticker_set = AsyncMock(return_value=fake_set)
+
+    fake_vision = AsyncMock(return_value=json.dumps({"success": True, "analysis": "A new dog"}))
+
+    with patch("tools.sticker_tools._build_bot", return_value=fake_bot), \
+         patch("tools.vision_tools.vision_analyze_tool", fake_vision), \
+         patch("tools.sticker_tools.cache_image_from_bytes", return_value="/tmp/fake.webp"):
+        from tools.sticker_tools import add_set_to_library_handler
+        result = json.loads(await add_set_to_library_handler({"set_name": "MyPack"}))
+
+    assert result["success"] is True
+    assert result["added"] == 2
+    assert result["skipped"] == 0
+
+    from gateway.sticker_library import get_sticker
+    assert get_sticker("uid_known")["description"] == "A known cat"  # cache reused
+    assert get_sticker("uid_new")["description"] == "A new dog"      # vision-derived
+    fake_vision.assert_awaited_once()  # only the new one
+
+
+@pytest.mark.asyncio
+async def test_add_set_to_library_skips_animated_and_video(patched_paths):
+    sticker_anim = MagicMock(file_unique_id="uid_a", file_id="FA", emoji="", set_name="P",
+                             is_animated=True, is_video=False)
+    sticker_video = MagicMock(file_unique_id="uid_v", file_id="FV", emoji="", set_name="P",
+                              is_animated=False, is_video=True)
+    sticker_static = MagicMock(file_unique_id="uid_s", file_id="FS", emoji="", set_name="P",
+                               is_animated=False, is_video=False)
+    static_file = MagicMock()
+    static_file.download_as_bytearray = AsyncMock(return_value=bytearray(b"x"))
+    sticker_static.get_file = AsyncMock(return_value=static_file)
+
+    fake_set = MagicMock(); fake_set.stickers = [sticker_anim, sticker_video, sticker_static]
+    fake_bot = MagicMock(); fake_bot.get_sticker_set = AsyncMock(return_value=fake_set)
+    fake_vision = AsyncMock(return_value=json.dumps({"success": True, "analysis": "static one"}))
+
+    with patch("tools.sticker_tools._build_bot", return_value=fake_bot), \
+         patch("tools.vision_tools.vision_analyze_tool", fake_vision), \
+         patch("tools.sticker_tools.cache_image_from_bytes", return_value="/tmp/fake.webp"):
+        from tools.sticker_tools import add_set_to_library_handler
+        result = json.loads(await add_set_to_library_handler({"set_name": "P"}))
+
+    assert result["added"] == 1
+    assert result["skipped"] == 2
+
+    from gateway.sticker_library import get_sticker
+    assert get_sticker("uid_s") is not None
+    assert get_sticker("uid_a") is None
+    assert get_sticker("uid_v") is None
