@@ -394,7 +394,10 @@ async def add_set_to_library_handler(args: dict, **_) -> str:
                     file_id=sticker.file_id,
                 )
         else:
-            # Cache miss: download + vision, then write cache.
+            # Cache miss: download + vision, then write cache only if vision succeeded.
+            # Matches _handle_sticker's behavior — never cache fallback descriptions
+            # (would poison future inbound encounters with the same sticker).
+            vision_succeeded = False
             try:
                 file_obj = await sticker.get_file()
                 image_bytes = await file_obj.download_as_bytearray()
@@ -407,17 +410,19 @@ async def add_set_to_library_handler(args: dict, **_) -> str:
                 vresult = json.loads(result_json)
                 if vresult.get("success"):
                     description = vresult.get("analysis", "a sticker")
+                    vision_succeeded = True
                 else:
                     description = f"a sticker with emoji {sticker.emoji}" if sticker.emoji else "a sticker"
             except Exception as e:
                 logger.warning("[Sticker] vision failed for %s: %s", sticker.file_unique_id, e)
                 description = f"a sticker with emoji {sticker.emoji}" if sticker.emoji else "a sticker"
 
-            cache_sticker_description(
-                sticker.file_unique_id, description,
-                emoji=sticker.emoji or "", set_name=sticker.set_name or "",
-                file_id=sticker.file_id,
-            )
+            if vision_succeeded:
+                cache_sticker_description(
+                    sticker.file_unique_id, description,
+                    emoji=sticker.emoji or "", set_name=sticker.set_name or "",
+                    file_id=sticker.file_id,
+                )
 
         add_sticker(sticker.file_unique_id, sticker.file_id, description, usage_notes="")
         added += 1

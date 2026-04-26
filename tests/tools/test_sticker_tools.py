@@ -310,3 +310,44 @@ async def test_add_set_to_library_skips_animated_and_video(patched_paths):
     assert get_sticker("uid_s") is not None
     assert get_sticker("uid_a") is None
     assert get_sticker("uid_v") is None
+
+
+@pytest.mark.asyncio
+async def test_add_set_to_library_does_not_cache_vision_failures(patched_paths):
+    """Vision failure must NOT poison the cache (matches _handle_sticker behavior)."""
+    cache_path, _library_path = patched_paths
+
+    sticker_fail = MagicMock(
+        file_unique_id="uid_fail", file_id="F_FAIL",
+        emoji="😺", set_name="MyPack",
+        is_animated=False, is_video=False,
+    )
+    file_obj = MagicMock()
+    file_obj.download_as_bytearray = AsyncMock(return_value=bytearray(b"x"))
+    sticker_fail.get_file = AsyncMock(return_value=file_obj)
+
+    fake_set = MagicMock(); fake_set.stickers = [sticker_fail]
+    fake_bot = MagicMock(); fake_bot.get_sticker_set = AsyncMock(return_value=fake_set)
+    # Vision returns success=False (NOT a raised exception — both should be uncached)
+    fake_vision = AsyncMock(return_value=json.dumps({"success": False, "error": "vision down"}))
+
+    with patch("tools.sticker_tools._build_bot", return_value=fake_bot), \
+         patch("tools.vision_tools.vision_analyze_tool", fake_vision), \
+         patch("tools.sticker_tools.cache_image_from_bytes", return_value="/tmp/x.webp"):
+        from tools.sticker_tools import add_set_to_library_handler
+        result = json.loads(await add_set_to_library_handler({"set_name": "MyPack"}))
+
+    # Library still gets the entry (with fallback description)
+    assert result["added"] == 1
+    from gateway.sticker_library import get_sticker
+    entry = get_sticker("uid_fail")
+    assert entry is not None
+    assert "emoji" in entry["description"].lower() or "sticker" in entry["description"].lower()
+
+    # But cache should be EMPTY — vision failure must not poison it
+    if cache_path.exists():
+        cache = json.loads(cache_path.read_text())
+        assert "uid_fail" not in cache, (
+            "Vision-failed sticker leaked into cache; would poison future "
+            "_handle_sticker hits"
+        )
