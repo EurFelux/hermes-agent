@@ -2837,8 +2837,8 @@ class TelegramAdapter(BasePlatformAdapter):
                 cache_sticker_description(
                     sticker.file_unique_id,
                     cached["description"],
-                    cached.get("emoji", ""),
-                    cached.get("set_name", ""),
+                    cached["emoji"],
+                    cached["set_name"],
                     file_id=sticker.file_id,
                 )
                 logger.info(
@@ -2846,7 +2846,7 @@ class TelegramAdapter(BasePlatformAdapter):
                     sticker.file_unique_id,
                 )
             event.text = build_sticker_injection(
-                cached["description"], cached.get("emoji", emoji), cached.get("set_name", set_name),
+                cached["description"], cached["emoji"], cached["set_name"],
                 file_unique_id=sticker.file_unique_id,
             )
             logger.info("[Telegram] Sticker cache hit: %s", sticker.file_unique_id)
