@@ -132,7 +132,20 @@ TOOLSETS = {
         "tools": ["send_message"],
         "includes": []
     },
-    
+
+    "stickers": {
+        "description": "Telegram sticker library — send/list/add/edit/remove stickers in your personal pack",
+        "tools": [
+            "send_sticker",
+            "list_my_stickers",
+            "add_sticker_to_library",
+            "add_set_to_library",
+            "edit_sticker",
+            "remove_from_library",
+        ],
+        "includes": []
+    },
+
     "rl": {
         "description": "RL training tools for running reinforcement learning on Tinker-Atropos",
         "tools": [
