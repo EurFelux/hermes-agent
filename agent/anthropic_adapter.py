@@ -1015,16 +1015,22 @@ def _is_bedrock_model_id(model: str) -> bool:
     return False
 
 
-def normalize_model_name(model: str, preserve_dots: bool = False) -> str:
+def normalize_model_name(model: str, preserve_dots: bool = True) -> str:
     """Normalize a model name for the Anthropic API.
 
     - Strips 'anthropic/' prefix (OpenRouter format, case-insensitive)
-    - Converts dots to hyphens in version numbers (OpenRouter uses dots,
-      Anthropic uses hyphens: claude-opus-4.6 → claude-opus-4-6), unless
-      preserve_dots is True (e.g. for Alibaba/DashScope: qwen3.5-plus).
+    - When ``preserve_dots`` is False, converts dots to hyphens in version
+      numbers (OpenRouter uses dots, Anthropic uses hyphens:
+      ``claude-opus-4.6`` → ``claude-opus-4-6``).
     - Preserves Bedrock model IDs (``anthropic.claude-opus-4-7``) and
       regional inference profiles (``us.anthropic.claude-*``) whose dots
       are namespace separators, not version separators.
+
+    Default policy (``preserve_dots=True``): pass user-supplied model
+    strings through verbatim. Callers that target *native*
+    ``api.anthropic.com`` and want OpenRouter-style ``claude-opus-4.6``
+    rewritten into Anthropic-native hyphenated form must opt in by
+    passing ``preserve_dots=False`` explicitly.
     """
     lower = model.lower()
     if lower.startswith("anthropic/"):
@@ -1514,7 +1520,7 @@ def build_anthropic_kwargs(
     reasoning_config: Optional[Dict[str, Any]],
     tool_choice: Optional[str] = None,
     is_oauth: bool = False,
-    preserve_dots: bool = False,
+    preserve_dots: bool = True,
     context_length: Optional[int] = None,
     base_url: str | None = None,
     fast_mode: bool = False,
