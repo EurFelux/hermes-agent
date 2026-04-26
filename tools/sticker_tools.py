@@ -227,3 +227,52 @@ registry.register(
     is_async=True,
     emoji="➕",
 )
+
+# --------- edit_sticker ---------
+
+EDIT_STICKER_SCHEMA = {
+    "name": "edit_sticker",
+    "description": (
+        "Update fields on a sticker in your library. Use this when the user "
+        "tells you when a sticker fits (e.g. 'use this one for greetings'). "
+        "Pass None for fields you don't want to change. Updates overwrite — "
+        "to extend usage_notes, list_my_stickers first to read the current "
+        "value, merge mentally, then write back the combined text."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "file_unique_id": {"type": "string"},
+            "description": {"type": "string", "description": "New description; omit to leave unchanged."},
+            "usage_notes": {"type": "string", "description": "New usage notes; omit to leave unchanged. Empty string clears the field."},
+        },
+        "required": ["file_unique_id"],
+    },
+}
+
+
+async def edit_sticker_handler(args: dict, **_) -> str:
+    file_unique_id = args.get("file_unique_id", "")
+    if not file_unique_id:
+        return _err("file_unique_id is required")
+
+    description = args.get("description") if "description" in args else None
+    usage_notes = args.get("usage_notes") if "usage_notes" in args else None
+
+    from gateway.sticker_library import edit_sticker
+    try:
+        edit_sticker(file_unique_id, description=description, usage_notes=usage_notes)
+    except KeyError:
+        return _err(f"Sticker {file_unique_id!r} is not in your library")
+
+    return _ok({"file_unique_id": file_unique_id})
+
+
+registry.register(
+    name="edit_sticker",
+    toolset="messaging",
+    schema=EDIT_STICKER_SCHEMA,
+    handler=edit_sticker_handler,
+    is_async=True,
+    emoji="✏️",
+)

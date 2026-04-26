@@ -181,3 +181,32 @@ async def test_add_sticker_to_library_legacy_entry_no_file_id(patched_paths):
     result = json.loads(await add_sticker_to_library_handler({"file_unique_id": "uid_legacy"}))
     assert result["success"] is False
     assert "send it again" in result["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_edit_sticker_updates_named_fields(patched_paths):
+    from gateway.sticker_library import add_sticker
+    add_sticker("uid_x", "F_X", "old desc", "old notes")
+
+    from tools.sticker_tools import edit_sticker_handler
+    result = json.loads(await edit_sticker_handler({
+        "file_unique_id": "uid_x",
+        "description": "new desc",
+        # usage_notes intentionally omitted
+    }))
+    assert result["success"] is True
+
+    from gateway.sticker_library import get_sticker
+    entry = get_sticker("uid_x")
+    assert entry["description"] == "new desc"
+    assert entry["usage_notes"] == "old notes"  # untouched
+
+
+@pytest.mark.asyncio
+async def test_edit_sticker_missing_returns_error(patched_paths):
+    from tools.sticker_tools import edit_sticker_handler
+    result = json.loads(await edit_sticker_handler({
+        "file_unique_id": "uid_missing", "description": "x",
+    }))
+    assert result["success"] is False
+    assert "not in your library" in result["error"].lower()
