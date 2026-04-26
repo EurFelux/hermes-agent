@@ -58,7 +58,7 @@ async def test_send_sticker_invalid_file_id_returns_actionable_error(patched_pat
     add_sticker("uid_dead", "FILE_DEAD", "stale", "")
 
     fake_bot = MagicMock()
-    fake_bot.send_sticker = AsyncMock(side_effect=BadRequest("Invalid file id"))
+    fake_bot.send_sticker = AsyncMock(side_effect=BadRequest("file_id_invalid"))
 
     with patch("tools.sticker_tools._build_bot", return_value=fake_bot), \
          patch("tools.sticker_tools._current_chat_id", return_value="999"):

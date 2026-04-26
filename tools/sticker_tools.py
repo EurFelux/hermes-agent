@@ -3,7 +3,7 @@ Sticker tools — agent-facing operations on the sticker library.
 
 Six tools register here: send_sticker, list_my_stickers, add_sticker_to_library,
 add_set_to_library, edit_sticker, remove_from_library. They are bundled into
-the hermes-telegram toolset (toolsets.py).
+the hermes-telegram toolset via toolsets.py once all six tools are registered.
 
 Bot/chat resolution: like ``tools/send_message_tool.py``, these tools build a
 short-lived ``telegram.Bot`` from ``TELEGRAM_BOT_TOKEN`` for each call. The
@@ -33,20 +33,17 @@ def _build_bot():
 
 def _current_chat_id() -> Optional[str]:
     """Read the current chat_id from gateway session env (None if not in a chat)."""
-    try:
-        from gateway.session_context import get_session_env
-        chat_id = get_session_env("HERMES_SESSION_CHAT_ID", "")
-        return chat_id or None
-    except Exception:
-        return None
+    from gateway.session_context import get_session_env
+    chat_id = get_session_env("HERMES_SESSION_CHAT_ID", "")
+    return chat_id or None
 
 
 def _err(msg: str) -> str:
-    return json.dumps({"success": False, "error": msg})
+    return json.dumps({"success": False, "error": msg}, ensure_ascii=False)
 
 
 def _ok(payload: dict) -> str:
-    return json.dumps({"success": True, **payload})
+    return json.dumps({"success": True, **payload}, ensure_ascii=False)
 
 
 # --------- send_sticker ---------
@@ -96,7 +93,14 @@ async def send_sticker_handler(args: dict, **_) -> str:
     try:
         msg = await bot.send_sticker(chat_id=int(chat_id), sticker=entry["file_id"])
     except BadRequest as e:
-        if "invalid file id" in str(e).lower():
+        err_lc = str(e).lower()
+        if (
+            "file_id_invalid" in err_lc
+            or "wrong file" in err_lc          # catches "wrong file_id" and "wrong file id"
+            or "wrong remote file" in err_lc
+            or "file_id is invalid" in err_lc
+            or "invalid file id" in err_lc     # keep as catch-all in case PTB normalizes
+        ):
             return _err(
                 "Sticker is no longer accessible (invalid file id). "
                 "You can call remove_from_library to drop it."
