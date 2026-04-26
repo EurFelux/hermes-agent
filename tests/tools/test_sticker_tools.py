@@ -210,3 +210,22 @@ async def test_edit_sticker_missing_returns_error(patched_paths):
     }))
     assert result["success"] is False
     assert "not in your library" in result["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_remove_from_library_existing(patched_paths):
+    from gateway.sticker_library import add_sticker, get_sticker
+    add_sticker("uid_x", "F_X", "desc", "")
+
+    from tools.sticker_tools import remove_from_library_handler
+    result = json.loads(await remove_from_library_handler({"file_unique_id": "uid_x"}))
+    assert result["success"] is True
+    assert get_sticker("uid_x") is None
+
+
+@pytest.mark.asyncio
+async def test_remove_from_library_missing_is_success(patched_paths):
+    """Removing a non-existent entry is a no-op success (idempotent)."""
+    from tools.sticker_tools import remove_from_library_handler
+    result = json.loads(await remove_from_library_handler({"file_unique_id": "uid_nope"}))
+    assert result["success"] is True

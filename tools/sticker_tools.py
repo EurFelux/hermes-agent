@@ -280,3 +280,43 @@ registry.register(
     is_async=True,
     emoji="✏️",
 )
+
+# --------- remove_from_library ---------
+
+REMOVE_STICKER_SCHEMA = {
+    "name": "remove_from_library",
+    "description": (
+        "Remove a sticker from your library. Use this when the user asks you "
+        "to forget a sticker, or when send_sticker fails with 'invalid file id' "
+        "meaning the sticker is no longer accessible."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "file_unique_id": {
+                "type": "string",
+                "description": "Stable identifier of a sticker already in your library.",
+            },
+        },
+        "required": ["file_unique_id"],
+    },
+}
+
+
+async def remove_from_library_handler(args: dict, **_) -> str:
+    file_unique_id = args.get("file_unique_id", "")
+    if not file_unique_id:
+        return _err("file_unique_id is required")
+    from gateway.sticker_library import remove_sticker
+    remove_sticker(file_unique_id)
+    return _ok({"file_unique_id": file_unique_id})
+
+
+registry.register(
+    name="remove_from_library",
+    toolset="messaging",
+    schema=REMOVE_STICKER_SCHEMA,
+    handler=remove_from_library_handler,
+    is_async=True,
+    emoji="🗑️",
+)
