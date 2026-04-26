@@ -90,3 +90,25 @@ async def test_list_my_stickers_empty(patched_paths):
     result = json.loads(await list_my_stickers_handler({}))
     assert result["success"] is True
     assert result["stickers"] == []
+
+
+def test_dispatch_async_sticker_tools_returns_json_string(patched_paths):
+    """
+    Regression: every async sticker tool MUST register with is_async=True.
+    Without it, registry.dispatch() returns an unawaited coroutine instead of
+    a JSON string, breaking the live agent.
+    """
+    import json as _json
+    from gateway.sticker_library import add_sticker
+    add_sticker("uid_d", "FD", "A dispatch test sticker", "")
+
+    from tools.registry import registry
+    # Trigger dispatch — if is_async is missing, this returns a coroutine, not str.
+    out = registry.dispatch("list_my_stickers", {})
+    assert isinstance(out, str), (
+        f"list_my_stickers dispatch returned {type(out).__name__}, not str — "
+        "is_async flag likely missing from registry.register"
+    )
+    payload = _json.loads(out)
+    assert payload["success"] is True
+    assert any(s["file_unique_id"] == "uid_d" for s in payload["stickers"])

@@ -122,6 +122,7 @@ registry.register(
     toolset="messaging",
     schema=SEND_STICKER_SCHEMA,
     handler=send_sticker_handler,
+    is_async=True,
     emoji="🎟️",
 )
 
@@ -139,7 +140,7 @@ LIST_MY_STICKERS_SCHEMA = {
 }
 
 
-async def list_my_stickers_handler(_args: dict, **_) -> str:
+async def list_my_stickers_handler(args: dict, **_) -> str:
     from gateway.sticker_library import list_stickers
     return _ok({"stickers": list_stickers()})
 
@@ -149,5 +150,6 @@ registry.register(
     toolset="messaging",
     schema=LIST_MY_STICKERS_SCHEMA,
     handler=list_my_stickers_handler,
+    is_async=True,
     emoji="📋",
 )
