@@ -69,7 +69,7 @@ class AnthropicTransport(ProviderTransport):
             reasoning_config=params.get("reasoning_config"),
             tool_choice=params.get("tool_choice"),
             is_oauth=params.get("is_oauth", False),
-            preserve_dots=params.get("preserve_dots", False),
+            preserve_dots=params.get("preserve_dots", True),
             context_length=params.get("context_length"),
             base_url=params.get("base_url"),
             fast_mode=params.get("fast_mode", False),

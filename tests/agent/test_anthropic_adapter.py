@@ -469,10 +469,29 @@ class TestNormalizeModelName:
         assert normalize_model_name("claude-sonnet-4-20250514") == "claude-sonnet-4-20250514"
 
     def test_converts_dots_to_hyphens(self):
-        """OpenRouter uses dots (4.6), Anthropic uses hyphens (4-6)."""
-        assert normalize_model_name("anthropic/claude-opus-4.6") == "claude-opus-4-6"
-        assert normalize_model_name("anthropic/claude-sonnet-4.5") == "claude-sonnet-4-5"
-        assert normalize_model_name("claude-opus-4.6") == "claude-opus-4-6"
+        """OpenRouter uses dots (4.6), Anthropic uses hyphens (4-6).
+
+        Default policy is now ``preserve_dots=True`` (trust user input);
+        callers targeting native ``api.anthropic.com`` opt in to mangling
+        by passing ``preserve_dots=False`` explicitly.
+        """
+        assert normalize_model_name("anthropic/claude-opus-4.6", preserve_dots=False) == "claude-opus-4-6"
+        assert normalize_model_name("anthropic/claude-sonnet-4.5", preserve_dots=False) == "claude-sonnet-4-5"
+        assert normalize_model_name("claude-opus-4.6", preserve_dots=False) == "claude-opus-4-6"
+
+    def test_default_preserves_dots(self):
+        """Default policy: pass user-supplied model strings through verbatim.
+
+        Reverses the prior default-mangle behavior. Hermes used to silently
+        rewrite ``moonshotai/kimi-k2.6`` → ``moonshotai/kimi-k2-6`` for any
+        Anthropic-format request, breaking third-party gateways that serve
+        non-Anthropic models. Trust user input by default; main agent loop
+        opts in to mangling via ``_anthropic_preserve_dots() == False``.
+        """
+        assert normalize_model_name("moonshotai/kimi-k2.6") == "moonshotai/kimi-k2.6"
+        assert normalize_model_name("claude-opus-4.6") == "claude-opus-4.6"
+        # ``anthropic/`` prefix stripping still applies regardless of mode.
+        assert normalize_model_name("anthropic/claude-opus-4.6") == "claude-opus-4.6"
 
     def test_already_hyphenated_unchanged(self):
         """Names already in Anthropic format should pass through."""
