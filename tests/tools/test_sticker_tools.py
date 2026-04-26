@@ -112,3 +112,68 @@ def test_dispatch_async_sticker_tools_returns_json_string(patched_paths):
     payload = _json.loads(out)
     assert payload["success"] is True
     assert any(s["file_unique_id"] == "uid_d" for s in payload["stickers"])
+
+
+@pytest.mark.asyncio
+async def test_add_sticker_to_library_happy_path(patched_paths):
+    from gateway.sticker_cache import cache_sticker_description
+    cache_sticker_description("uid_x", "A waving cat", emoji="👋", set_name="Cats", file_id="F_X")
+
+    from tools.sticker_tools import add_sticker_to_library_handler
+    result = json.loads(await add_sticker_to_library_handler({"file_unique_id": "uid_x"}))
+    assert result["success"] is True
+
+    from gateway.sticker_library import get_sticker
+    entry = get_sticker("uid_x")
+    assert entry["file_id"] == "F_X"
+    assert entry["description"] == "A waving cat"
+    assert entry["usage_notes"] == ""
+
+
+@pytest.mark.asyncio
+async def test_add_sticker_to_library_with_overrides(patched_paths):
+    from gateway.sticker_cache import cache_sticker_description
+    cache_sticker_description("uid_x", "Default desc", file_id="F_X")
+
+    from tools.sticker_tools import add_sticker_to_library_handler
+    args = {
+        "file_unique_id": "uid_x",
+        "description": "Custom desc",
+        "usage_notes": "Use for hellos",
+    }
+    result = json.loads(await add_sticker_to_library_handler(args))
+    assert result["success"] is True
+
+    from gateway.sticker_library import get_sticker
+    entry = get_sticker("uid_x")
+    assert entry["description"] == "Custom desc"
+    assert entry["usage_notes"] == "Use for hellos"
+
+
+@pytest.mark.asyncio
+async def test_add_sticker_to_library_cache_miss(patched_paths):
+    from tools.sticker_tools import add_sticker_to_library_handler
+    result = json.loads(await add_sticker_to_library_handler({"file_unique_id": "uid_unknown"}))
+    assert result["success"] is False
+    assert "not been received" in result["error"].lower() or "no cached" in result["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_add_sticker_to_library_legacy_entry_no_file_id(patched_paths):
+    """Cache entry exists but lacks file_id → actionable error directing the user to resend."""
+    cache_path, _ = patched_paths
+    legacy = {
+        "uid_legacy": {
+            "description": "An old sticker",
+            "emoji": "",
+            "set_name": "",
+            "cached_at": 1.0,
+            # no file_id
+        }
+    }
+    cache_path.write_text(json.dumps(legacy))
+
+    from tools.sticker_tools import add_sticker_to_library_handler
+    result = json.loads(await add_sticker_to_library_handler({"file_unique_id": "uid_legacy"}))
+    assert result["success"] is False
+    assert "send it again" in result["error"].lower()

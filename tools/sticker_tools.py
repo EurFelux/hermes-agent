@@ -153,3 +153,75 @@ registry.register(
     is_async=True,
     emoji="📋",
 )
+
+# --------- add_sticker_to_library ---------
+
+ADD_STICKER_SCHEMA = {
+    "name": "add_sticker_to_library",
+    "description": (
+        "Add a single sticker to your library. Use this when the user asks you "
+        "to remember a specific sticker — typically one they just sent. Get the "
+        "file_unique_id from the sticker message they sent (shown as 'id: ...' "
+        "in the inbound text). Optionally pass description or usage_notes to "
+        "override the defaults."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "file_unique_id": {
+                "type": "string",
+                "description": "Stable identifier of the sticker, taken from inbound (id: ...) text.",
+            },
+            "description": {
+                "type": "string",
+                "description": "Override for the description; if omitted, uses the cached vision description.",
+            },
+            "usage_notes": {
+                "type": "string",
+                "description": "Initial usage notes; defaults to empty (you can fill in later via edit_sticker).",
+            },
+        },
+        "required": ["file_unique_id"],
+    },
+}
+
+
+async def add_sticker_to_library_handler(args: dict, **_) -> str:
+    file_unique_id = args.get("file_unique_id", "")
+    if not file_unique_id:
+        return _err("file_unique_id is required")
+
+    from gateway.sticker_cache import get_cached_description
+    cached = get_cached_description(file_unique_id)
+    if not cached:
+        return _err(
+            f"No cached entry for {file_unique_id!r}. The sticker hasn't been "
+            "received in this profile yet."
+        )
+
+    file_id = cached.get("file_id", "")
+    if not file_id:
+        return _err(
+            "This sticker hasn't been seen since the cache was upgraded. "
+            "Please send it again so I can register it."
+        )
+
+    description = args.get("description")
+    if description is None:
+        description = cached["description"]
+    usage_notes = args.get("usage_notes", "")
+
+    from gateway.sticker_library import add_sticker
+    add_sticker(file_unique_id, file_id, description, usage_notes)
+
+    return _ok({"file_unique_id": file_unique_id, "description": description})
+
+
+registry.register(
+    name="add_sticker_to_library",
+    toolset="messaging",
+    schema=ADD_STICKER_SCHEMA,
+    handler=add_sticker_to_library_handler,
+    is_async=True,
+    emoji="➕",
+)
