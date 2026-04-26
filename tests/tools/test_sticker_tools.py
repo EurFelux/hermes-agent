@@ -159,7 +159,7 @@ async def test_add_sticker_to_library_cache_miss(patched_paths):
     from tools.sticker_tools import add_sticker_to_library_handler
     result = json.loads(await add_sticker_to_library_handler({"file_unique_id": "uid_unknown"}))
     assert result["success"] is False
-    assert "not been received" in result["error"].lower() or "no cached" in result["error"].lower()
+    assert "hasn't been received" in result["error"]
 
 
 @pytest.mark.asyncio

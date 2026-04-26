@@ -1,9 +1,11 @@
 """
 Sticker tools — agent-facing operations on the sticker library.
 
-Six tools register here: send_sticker, list_my_stickers, add_sticker_to_library,
-add_set_to_library, edit_sticker, remove_from_library. They are bundled into
-the hermes-telegram toolset via toolsets.py once all six tools are registered.
+This file will hold six sticker tools — send_sticker, list_my_stickers,
+add_sticker_to_library, add_set_to_library, edit_sticker, remove_from_library
+— that bundle into the hermes-telegram toolset via toolsets.py. They are
+added incrementally across Tasks 5-10; each tool is a self-contained
+section below, registered at module load via registry.register().
 
 Bot/chat resolution: like ``tools/send_message_tool.py``, these tools build a
 short-lived ``telegram.Bot`` from ``TELEGRAM_BOT_TOKEN`` for each call. The
