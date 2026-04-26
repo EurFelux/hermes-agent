@@ -80,6 +80,40 @@ class TestCacheSticker:
         assert r1["description"] == "Cat"
         assert r2["description"] == "Dog"
 
+    def test_cache_persists_file_id(self, tmp_path):
+        cache_file = tmp_path / "cache.json"
+        with patch("gateway.sticker_cache.CACHE_PATH", cache_file):
+            cache_sticker_description(
+                "uid_2", "A waving cat", emoji="👋", set_name="Cats",
+                file_id="CAACAgIAFILEID",
+            )
+            result = get_cached_description("uid_2")
+        assert result is not None
+        assert result["file_id"] == "CAACAgIAFILEID"
+        # Existing fields still present
+        assert result["description"] == "A waving cat"
+        assert result["emoji"] == "👋"
+        assert result["set_name"] == "Cats"
+
+    def test_legacy_cache_entry_loads_without_file_id(self, tmp_path):
+        """Pre-upgrade entries lack file_id; loader must not crash."""
+        cache_file = tmp_path / "cache.json"
+        legacy = {
+            "uid_old": {
+                "description": "An old sticker",
+                "emoji": "",
+                "set_name": "",
+                "cached_at": 1.0,
+                # Note: no 'file_id' key
+            }
+        }
+        cache_file.write_text(json.dumps(legacy))
+        with patch("gateway.sticker_cache.CACHE_PATH", cache_file):
+            result = get_cached_description("uid_old")
+        assert result is not None
+        assert result["description"] == "An old sticker"
+        assert "file_id" not in result  # explicit: legacy entries are still legacy
+
 
 class TestBuildStickerInjection:
     def test_exact_format_no_context(self):

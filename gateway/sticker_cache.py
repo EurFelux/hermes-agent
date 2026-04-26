@@ -59,6 +59,7 @@ def cache_sticker_description(
     description: str,
     emoji: str = "",
     set_name: str = "",
+    file_id: str = "",
 ) -> None:
     """
     Store a sticker description in the cache.
@@ -68,6 +69,10 @@ def cache_sticker_description(
         description:    Vision-generated description text.
         emoji:          Associated emoji (e.g. "😀").
         set_name:       Sticker set name if available.
+        file_id:        Telegram's bot-scoped file identifier — required by
+                        bot.send_sticker() to resend the same sticker.
+                        Empty string for legacy callers; new callers should
+                        always pass it (see ``_handle_sticker``).
     """
     cache = _load_cache()
     cache[file_unique_id] = {
@@ -76,6 +81,8 @@ def cache_sticker_description(
         "set_name": set_name,
         "cached_at": time.time(),
     }
+    if file_id:
+        cache[file_unique_id]["file_id"] = file_id
     _save_cache(cache)
 
 
