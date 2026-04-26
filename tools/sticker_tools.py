@@ -235,14 +235,18 @@ EDIT_STICKER_SCHEMA = {
     "description": (
         "Update fields on a sticker in your library. Use this when the user "
         "tells you when a sticker fits (e.g. 'use this one for greetings'). "
-        "Pass None for fields you don't want to change. Updates overwrite — "
-        "to extend usage_notes, list_my_stickers first to read the current "
-        "value, merge mentally, then write back the combined text."
+        "Omit any field you don't want to change. To clear `usage_notes`, "
+        "pass an empty string. Updates overwrite — to extend usage_notes, "
+        "list_my_stickers first to read the current value, merge mentally, "
+        "then write back the combined text."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "file_unique_id": {"type": "string"},
+            "file_unique_id": {
+                "type": "string",
+                "description": "Stable identifier of a sticker already in your library.",
+            },
             "description": {"type": "string", "description": "New description; omit to leave unchanged."},
             "usage_notes": {"type": "string", "description": "New usage notes; omit to leave unchanged. Empty string clears the field."},
         },
