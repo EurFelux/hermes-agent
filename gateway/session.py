@@ -412,7 +412,10 @@ def build_session_context_prompt(
                 lines.append(sticker_section)
         except Exception:
             # Library injection must never break session bootstrap.
-            pass
+            logger.debug(
+                "Sticker library injection skipped due to error",
+                exc_info=True,
+            )
 
     return "\n".join(lines)
 

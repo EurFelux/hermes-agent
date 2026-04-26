@@ -1,9 +1,6 @@
 """Tests for sticker section appended to build_session_context_prompt on Telegram."""
 
 from unittest.mock import patch
-from types import SimpleNamespace
-
-import pytest
 
 
 def _make_telegram_context(tmp_path):
