@@ -102,6 +102,10 @@ def test_dispatch_async_sticker_tools_returns_json_string(patched_paths):
     from gateway.sticker_library import add_sticker
     add_sticker("uid_d", "FD", "A dispatch test sticker", "")
 
+    # Force registration; otherwise this test depends on import side-effects
+    # from sibling tests (which fail under pytest-xdist or in-isolation runs).
+    import tools.sticker_tools  # noqa: F401
+
     from tools.registry import registry
     # Trigger dispatch — if is_async is missing, this returns a coroutine, not str.
     out = registry.dispatch("list_my_stickers", {})
