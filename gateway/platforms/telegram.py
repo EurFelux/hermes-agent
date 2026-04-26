@@ -2868,28 +2868,29 @@ class TelegramAdapter(BasePlatformAdapter):
 
             if result.get("success"):
                 description = result.get("analysis", "a sticker")
-                cache_sticker_description(
-                    sticker.file_unique_id, description, emoji, set_name,
-                    file_id=sticker.file_id,
-                )
-                event.text = build_sticker_injection(
-                    description, emoji, set_name,
-                    file_unique_id=sticker.file_unique_id,
-                )
             else:
-                # Vision failed -- use emoji as fallback
-                event.text = build_sticker_injection(
-                    f"a sticker with emoji {emoji}" if emoji else "a sticker",
-                    emoji, set_name,
-                    file_unique_id=sticker.file_unique_id,
+                # Vision returned an error response -- fall back to emoji-based label.
+                logger.warning(
+                    "[Telegram] Vision rejected sticker %s: %s",
+                    sticker.file_unique_id, result.get("error", "unknown error"),
                 )
+                description = f"a sticker with emoji {emoji}" if emoji else "a sticker"
         except Exception as e:
             logger.warning("[Telegram] Sticker analysis error: %s", e, exc_info=True)
-            event.text = build_sticker_injection(
-                f"a sticker with emoji {emoji}" if emoji else "a sticker",
-                emoji, set_name,
-                file_unique_id=sticker.file_unique_id,
-            )
+            description = f"a sticker with emoji {emoji}" if emoji else "a sticker"
+
+        # Always cache the result (real description on vision-success, fallback
+        # on vision-failure) so the sticker can be added to the agent's library
+        # even when the vision tool is misconfigured. The agent can use
+        # ``edit_sticker`` to refine a fallback description later.
+        cache_sticker_description(
+            sticker.file_unique_id, description, emoji, set_name,
+            file_id=sticker.file_id,
+        )
+        event.text = build_sticker_injection(
+            description, emoji, set_name,
+            file_unique_id=sticker.file_unique_id,
+        )
 
     def _reload_dm_topics_from_config(self) -> None:
         """Re-read dm_topics from config.yaml and load any new thread_ids into cache.

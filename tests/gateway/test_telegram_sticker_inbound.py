@@ -114,3 +114,81 @@ async def test_handle_sticker_injection_text_includes_file_unique_id(tmp_path):
 
     assert "uid_visible" in event.text  # id is referenceable
     assert "A cat waving" in event.text
+
+
+@pytest.mark.asyncio
+async def test_handle_sticker_caches_with_fallback_on_vision_failure(tmp_path):
+    """When vision returns success=False, _handle_sticker still caches the
+    file_id with a fallback description so the sticker can later be added to
+    the library via add_sticker_to_library. Robustness against vision
+    misconfiguration — the sticker library must not be locked out by a
+    transient or persistent vision outage."""
+    cache_file = tmp_path / "cache.json"
+
+    sticker = MagicMock()
+    sticker.file_unique_id = "uid_visionfail"
+    sticker.file_id = "FILEID_VFAIL"
+    sticker.emoji = "🐶"
+    sticker.set_name = "Dogs"
+    sticker.is_animated = False
+    sticker.is_video = False
+    sticker.get_file = AsyncMock()
+    file_obj = MagicMock()
+    file_obj.download_as_bytearray = AsyncMock(return_value=bytearray(b"bytes"))
+    sticker.get_file.return_value = file_obj
+
+    msg = MagicMock(); msg.sticker = sticker
+    event = MagicMock(); event.text = ""
+
+    from gateway.platforms.telegram import TelegramAdapter
+    adapter = TelegramAdapter.__new__(TelegramAdapter)
+
+    fake_vision = AsyncMock(return_value=json.dumps({"success": False, "error": "vision down"}))
+    with patch("gateway.sticker_cache.CACHE_PATH", cache_file), \
+         patch("tools.vision_tools.vision_analyze_tool", fake_vision), \
+         patch("gateway.platforms.telegram.cache_image_from_bytes", return_value="/tmp/fake.webp"):
+        await adapter._handle_sticker(msg, event)
+
+    # Cache contains file_id with fallback description, not silently absent.
+    cache = json.loads(cache_file.read_text())
+    assert cache["uid_visionfail"]["file_id"] == "FILEID_VFAIL"
+    desc_lc = cache["uid_visionfail"]["description"].lower()
+    assert "emoji" in desc_lc or "sticker" in desc_lc
+
+    # Injection text references the sticker so the agent can act on it.
+    assert "uid_visionfail" in event.text
+
+
+@pytest.mark.asyncio
+async def test_handle_sticker_caches_with_fallback_on_vision_exception(tmp_path):
+    """When vision raises (e.g. invalid model 404), _handle_sticker still
+    caches the file_id with a fallback description."""
+    cache_file = tmp_path / "cache.json"
+
+    sticker = MagicMock()
+    sticker.file_unique_id = "uid_visionexc"
+    sticker.file_id = "FILEID_VEXC"
+    sticker.emoji = "🦊"
+    sticker.set_name = "Foxes"
+    sticker.is_animated = False
+    sticker.is_video = False
+    sticker.get_file = AsyncMock()
+    file_obj = MagicMock()
+    file_obj.download_as_bytearray = AsyncMock(return_value=bytearray(b"bytes"))
+    sticker.get_file.return_value = file_obj
+
+    msg = MagicMock(); msg.sticker = sticker
+    event = MagicMock(); event.text = ""
+
+    from gateway.platforms.telegram import TelegramAdapter
+    adapter = TelegramAdapter.__new__(TelegramAdapter)
+
+    fake_vision = AsyncMock(side_effect=RuntimeError("vision API exploded"))
+    with patch("gateway.sticker_cache.CACHE_PATH", cache_file), \
+         patch("tools.vision_tools.vision_analyze_tool", fake_vision), \
+         patch("gateway.platforms.telegram.cache_image_from_bytes", return_value="/tmp/fake.webp"):
+        await adapter._handle_sticker(msg, event)
+
+    # Even with an exception, file_id is cached.
+    cache = json.loads(cache_file.read_text())
+    assert cache["uid_visionexc"]["file_id"] == "FILEID_VEXC"
