@@ -24,7 +24,7 @@ async def test_send_sticker_happy_path(patched_paths):
     add_sticker("uid_1", "FILE_1", "A cat", "greetings")
 
     fake_bot = MagicMock()
-    fake_bot.send_sticker = AsyncMock()
+    fake_bot.send_sticker = AsyncMock(return_value=MagicMock(message_id=42))
 
     with patch("tools.sticker_tools._build_bot", return_value=fake_bot), \
          patch("tools.sticker_tools._current_chat_id", return_value="999"):

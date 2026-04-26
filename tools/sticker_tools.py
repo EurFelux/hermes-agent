@@ -105,13 +105,11 @@ async def send_sticker_handler(args: dict, **_) -> str:
     except Exception as e:
         return _err(f"Failed to send sticker: {e}")
 
-    raw_msg_id = getattr(msg, "message_id", None)
-    message_id = raw_msg_id if isinstance(raw_msg_id, (int, type(None))) else None
     return _ok({
         "platform": "telegram",
         "chat_id": chat_id,
         "file_unique_id": file_unique_id,
-        "message_id": message_id,
+        "message_id": getattr(msg, "message_id", None),
     })
 
 
