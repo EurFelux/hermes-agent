@@ -67,3 +67,26 @@ async def test_send_sticker_invalid_file_id_returns_actionable_error(patched_pat
 
     assert result["success"] is False
     assert "remove_from_library" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_list_my_stickers_returns_entries(patched_paths):
+    from gateway.sticker_library import add_sticker
+    add_sticker("uid_a", "FA", "A cat", "greetings")
+    add_sticker("uid_b", "FB", "A panda", "")
+
+    from tools.sticker_tools import list_my_stickers_handler
+    result = json.loads(await list_my_stickers_handler({}))
+    assert result["success"] is True
+    ids = {s["file_unique_id"] for s in result["stickers"]}
+    assert ids == {"uid_a", "uid_b"}
+    # file_id must NOT leak into agent-visible output
+    assert all("file_id" not in s for s in result["stickers"])
+
+
+@pytest.mark.asyncio
+async def test_list_my_stickers_empty(patched_paths):
+    from tools.sticker_tools import list_my_stickers_handler
+    result = json.loads(await list_my_stickers_handler({}))
+    assert result["success"] is True
+    assert result["stickers"] == []

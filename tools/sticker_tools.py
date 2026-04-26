@@ -124,3 +124,30 @@ registry.register(
     handler=send_sticker_handler,
     emoji="🎟️",
 )
+
+# --------- list_my_stickers ---------
+
+LIST_MY_STICKERS_SCHEMA = {
+    "name": "list_my_stickers",
+    "description": (
+        "List all stickers in your sticker library with their descriptions and any "
+        "usage notes you've recorded. Use this before deciding to send a sticker, "
+        "or when the user asks what stickers you have. Returns a list of "
+        "{file_unique_id, description, usage_notes} entries."
+    ),
+    "parameters": {"type": "object", "properties": {}, "required": []},
+}
+
+
+async def list_my_stickers_handler(_args: dict, **_) -> str:
+    from gateway.sticker_library import list_stickers
+    return _ok({"stickers": list_stickers()})
+
+
+registry.register(
+    name="list_my_stickers",
+    toolset="messaging",
+    schema=LIST_MY_STICKERS_SCHEMA,
+    handler=list_my_stickers_handler,
+    emoji="📋",
+)
