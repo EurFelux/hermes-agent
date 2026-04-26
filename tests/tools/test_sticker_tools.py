@@ -159,7 +159,7 @@ async def test_add_sticker_to_library_cache_miss(patched_paths):
     from tools.sticker_tools import add_sticker_to_library_handler
     result = json.loads(await add_sticker_to_library_handler({"file_unique_id": "uid_unknown"}))
     assert result["success"] is False
-    assert "hasn't been received" in result["error"]
+    assert "hasn't been registered" in result["error"]
 
 
 @pytest.mark.asyncio
@@ -180,7 +180,7 @@ async def test_add_sticker_to_library_legacy_entry_no_file_id(patched_paths):
     from tools.sticker_tools import add_sticker_to_library_handler
     result = json.loads(await add_sticker_to_library_handler({"file_unique_id": "uid_legacy"}))
     assert result["success"] is False
-    assert "send it again" in result["error"].lower()
+    assert "hasn't been registered" in result["error"]
 
 
 @pytest.mark.asyncio
@@ -313,8 +313,11 @@ async def test_add_set_to_library_skips_animated_and_video(patched_paths):
 
 
 @pytest.mark.asyncio
-async def test_add_set_to_library_does_not_cache_vision_failures(patched_paths):
-    """Vision failure must NOT poison the cache (matches _handle_sticker behavior)."""
+async def test_add_set_to_library_caches_with_fallback_on_vision_failure(patched_paths):
+    """Vision failure still caches the file_id (with a fallback description) so
+    add_sticker_to_library can find it later. Sticker library must remain
+    usable when vision is misconfigured — users can fix descriptions via
+    edit_sticker."""
     cache_path, _library_path = patched_paths
 
     sticker_fail = MagicMock(
@@ -328,7 +331,6 @@ async def test_add_set_to_library_does_not_cache_vision_failures(patched_paths):
 
     fake_set = MagicMock(); fake_set.stickers = [sticker_fail]
     fake_bot = MagicMock(); fake_bot.get_sticker_set = AsyncMock(return_value=fake_set)
-    # Vision returns success=False (NOT a raised exception — both should be uncached)
     fake_vision = AsyncMock(return_value=json.dumps({"success": False, "error": "vision down"}))
 
     with patch("tools.sticker_tools._build_bot", return_value=fake_bot), \
@@ -337,17 +339,16 @@ async def test_add_set_to_library_does_not_cache_vision_failures(patched_paths):
         from tools.sticker_tools import add_set_to_library_handler
         result = json.loads(await add_set_to_library_handler({"set_name": "MyPack"}))
 
-    # Library still gets the entry (with fallback description)
+    # Library gets the entry with fallback description.
     assert result["added"] == 1
     from gateway.sticker_library import get_sticker
     entry = get_sticker("uid_fail")
     assert entry is not None
+    assert entry["file_id"] == "F_FAIL"
     assert "emoji" in entry["description"].lower() or "sticker" in entry["description"].lower()
 
-    # But cache should be EMPTY — vision failure must not poison it
-    if cache_path.exists():
-        cache = json.loads(cache_path.read_text())
-        assert "uid_fail" not in cache, (
-            "Vision-failed sticker leaked into cache; would poison future "
-            "_handle_sticker hits"
-        )
+    # Cache also gets the file_id + fallback description so future cache hits
+    # don't have to retry vision and add_sticker_to_library can resolve file_id.
+    cache = json.loads(cache_path.read_text())
+    assert cache["uid_fail"]["file_id"] == "F_FAIL"
+    assert cache["uid_fail"]["description"]  # non-empty fallback

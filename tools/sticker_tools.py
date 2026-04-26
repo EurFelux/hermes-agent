@@ -161,11 +161,13 @@ registry.register(
 ADD_STICKER_SCHEMA = {
     "name": "add_sticker_to_library",
     "description": (
-        "Add a single sticker to your library. Use this when the user asks you "
-        "to remember a specific sticker — typically one they just sent. Get the "
-        "file_unique_id from the sticker message they sent (shown as 'id: ...' "
-        "in the inbound text). Optionally pass description or usage_notes to "
-        "override the defaults."
+        "Add a single sticker to your library so you can send it later. Use "
+        "this when the user asks you to remember a specific sticker — typically "
+        "one they just sent. Get the file_unique_id from the (id: ...) marker "
+        "in the inbound sticker text. The cached description is used by default; "
+        "if the cached one is a generic fallback (e.g. 'a sticker with emoji 🐱', "
+        "which means the inbound vision pass failed), pass a better description "
+        "in your own words — ask the user to describe it if you can't tell."
     ),
     "parameters": {
         "type": "object",
@@ -176,7 +178,11 @@ ADD_STICKER_SCHEMA = {
             },
             "description": {
                 "type": "string",
-                "description": "Override for the description; if omitted, uses the cached vision description.",
+                "description": (
+                    "Override the cached description. Useful when vision failed "
+                    "(cached description is a generic emoji-based fallback) and "
+                    "you want to record what the sticker actually shows."
+                ),
             },
             "usage_notes": {
                 "type": "string",
@@ -195,22 +201,16 @@ async def add_sticker_to_library_handler(args: dict, **_) -> str:
 
     from gateway.sticker_cache import get_cached_description
     cached = get_cached_description(file_unique_id)
-    if not cached:
-        return _err(
-            f"No cached entry for {file_unique_id!r}. The sticker hasn't been "
-            "received in this profile yet."
-        )
-
-    file_id = cached.get("file_id", "")
+    file_id = cached.get("file_id", "") if cached else ""
     if not file_id:
         return _err(
-            "This sticker hasn't been seen since the cache was upgraded. "
-            "Please send it again so I can register it."
+            f"Sticker {file_unique_id!r} hasn't been registered yet. Ask the "
+            "user to send the sticker again so I can capture its file_id."
         )
 
     description = args.get("description")
     if description is None:
-        description = cached["description"]
+        description = cached.get("description") or "a sticker"
     usage_notes = args.get("usage_notes", "")
 
     from gateway.sticker_library import add_sticker
@@ -393,10 +393,11 @@ async def add_set_to_library_handler(args: dict, **_) -> str:
                     file_id=sticker.file_id,
                 )
         else:
-            # Cache miss: download + vision, then write cache only if vision succeeded.
-            # Matches _handle_sticker's behavior — never cache fallback descriptions
-            # (would poison future inbound encounters with the same sticker).
-            vision_succeeded = False
+            # Cache miss: download + vision (best-effort).  Whether vision
+            # succeeds or fails, we still cache the file_id (with a
+            # vision-fallback description if needed) so future encounters
+            # don't have to retry vision and the sticker can be
+            # add_sticker_to_library'd by id alone.
             try:
                 file_obj = await sticker.get_file()
                 image_bytes = await file_obj.download_as_bytearray()
@@ -409,19 +410,21 @@ async def add_set_to_library_handler(args: dict, **_) -> str:
                 vresult = json.loads(result_json)
                 if vresult.get("success"):
                     description = vresult.get("analysis", "a sticker")
-                    vision_succeeded = True
                 else:
+                    logger.warning(
+                        "[Sticker] vision rejected %s: %s",
+                        sticker.file_unique_id, vresult.get("error", "unknown"),
+                    )
                     description = f"a sticker with emoji {sticker.emoji}" if sticker.emoji else "a sticker"
             except Exception as e:
                 logger.warning("[Sticker] vision failed for %s: %s", sticker.file_unique_id, e)
                 description = f"a sticker with emoji {sticker.emoji}" if sticker.emoji else "a sticker"
 
-            if vision_succeeded:
-                cache_sticker_description(
-                    sticker.file_unique_id, description,
-                    emoji=sticker.emoji or "", set_name=sticker.set_name or "",
-                    file_id=sticker.file_id,
-                )
+            cache_sticker_description(
+                sticker.file_unique_id, description,
+                emoji=sticker.emoji or "", set_name=sticker.set_name or "",
+                file_id=sticker.file_id,
+            )
 
         add_sticker(sticker.file_unique_id, sticker.file_id, description, usage_notes="")
         added += 1
