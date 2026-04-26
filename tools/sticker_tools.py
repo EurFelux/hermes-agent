@@ -121,7 +121,7 @@ async def send_sticker_handler(args: dict, **_) -> str:
 
 registry.register(
     name="send_sticker",
-    toolset="messaging",
+    toolset="stickers",
     schema=SEND_STICKER_SCHEMA,
     handler=send_sticker_handler,
     is_async=True,
@@ -149,7 +149,7 @@ async def list_my_stickers_handler(args: dict, **_) -> str:
 
 registry.register(
     name="list_my_stickers",
-    toolset="messaging",
+    toolset="stickers",
     schema=LIST_MY_STICKERS_SCHEMA,
     handler=list_my_stickers_handler,
     is_async=True,
@@ -221,7 +221,7 @@ async def add_sticker_to_library_handler(args: dict, **_) -> str:
 
 registry.register(
     name="add_sticker_to_library",
-    toolset="messaging",
+    toolset="stickers",
     schema=ADD_STICKER_SCHEMA,
     handler=add_sticker_to_library_handler,
     is_async=True,
@@ -274,7 +274,7 @@ async def edit_sticker_handler(args: dict, **_) -> str:
 
 registry.register(
     name="edit_sticker",
-    toolset="messaging",
+    toolset="stickers",
     schema=EDIT_STICKER_SCHEMA,
     handler=edit_sticker_handler,
     is_async=True,
@@ -314,7 +314,7 @@ async def remove_from_library_handler(args: dict, **_) -> str:
 
 registry.register(
     name="remove_from_library",
-    toolset="messaging",
+    toolset="stickers",
     schema=REMOVE_STICKER_SCHEMA,
     handler=remove_from_library_handler,
     is_async=True,
@@ -436,7 +436,7 @@ async def add_set_to_library_handler(args: dict, **_) -> str:
 
 registry.register(
     name="add_set_to_library",
-    toolset="messaging",
+    toolset="stickers",
     schema=ADD_SET_SCHEMA,
     handler=add_set_to_library_handler,
     is_async=True,
