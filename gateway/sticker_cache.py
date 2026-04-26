@@ -59,6 +59,7 @@ def cache_sticker_description(
     description: str,
     emoji: str = "",
     set_name: str = "",
+    file_id: str = "",
 ) -> None:
     """
     Store a sticker description in the cache.
@@ -68,6 +69,10 @@ def cache_sticker_description(
         description:    Vision-generated description text.
         emoji:          Associated emoji (e.g. "😀").
         set_name:       Sticker set name if available.
+        file_id:        Telegram's bot-scoped file identifier — required by
+                        bot.send_sticker() to resend the same sticker.
+                        Empty string for legacy callers; new callers should
+                        always pass it (see ``_handle_sticker``).
     """
     cache = _load_cache()
     cache[file_unique_id] = {
@@ -76,6 +81,8 @@ def cache_sticker_description(
         "set_name": set_name,
         "cached_at": time.time(),
     }
+    if file_id:
+        cache[file_unique_id]["file_id"] = file_id
     _save_cache(cache)
 
 
@@ -83,12 +90,17 @@ def build_sticker_injection(
     description: str,
     emoji: str = "",
     set_name: str = "",
+    file_unique_id: str = "",
 ) -> str:
     """
     Build the warm-style injection text for a sticker description.
 
     Returns a string like:
-      [The user sent a sticker 😀 from "MyPack"~ It shows: "A cat waving" (=^.w.^=)]
+      [The user sent a sticker 😀 from "MyPack" (id: AgADxyz)~ It shows: "A cat waving" (=^.w.^=)]
+
+    The ``file_unique_id`` is included so the agent can reference the sticker
+    when calling sticker tools (e.g. ``add_sticker_to_library``). It is omitted
+    if not provided, preserving backward-compatible output.
     """
     context = ""
     if set_name and emoji:
@@ -96,7 +108,11 @@ def build_sticker_injection(
     elif emoji:
         context = f" {emoji}"
 
-    return f"[The user sent a sticker{context}~ It shows: \"{description}\" (=^.w.^=)]"
+    id_suffix = f" (id: {file_unique_id})" if file_unique_id else ""
+    return (
+        f"[The user sent a sticker{context}{id_suffix}~ "
+        f"It shows: \"{description}\" (=^.w.^=)]"
+    )
 
 
 def build_animated_sticker_injection(emoji: str = "") -> str:

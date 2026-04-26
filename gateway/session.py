@@ -398,7 +398,25 @@ def build_session_context_prompt(
     # Note about explicit targeting
     lines.append("")
     lines.append("*For explicit targeting, use `\"platform:chat_id\"` format if the user provides a specific chat ID.*")
-    
+
+    # Sticker library snapshot (Telegram only).
+    # Session-scoped: built once at session start, never rebuilt mid-session
+    # (would break prompt caching). Mid-session changes to the library are
+    # accessed by the agent via list_my_stickers.
+    if context.source.platform == Platform.TELEGRAM:
+        try:
+            from gateway.sticker_library import get_session_context_section
+            sticker_section = get_session_context_section()
+            if sticker_section:
+                lines.append("")
+                lines.append(sticker_section)
+        except Exception:
+            # Library injection must never break session bootstrap.
+            logger.debug(
+                "Sticker library injection skipped due to error",
+                exc_info=True,
+            )
+
     return "\n".join(lines)
 
 

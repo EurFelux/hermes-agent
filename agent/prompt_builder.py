@@ -308,7 +308,11 @@ PLATFORM_HINTS = {
         "include MEDIA:/absolute/path/to/file in your response. Images "
         "(.png, .jpg, .webp) appear as photos, audio (.ogg) sends as voice "
         "bubbles, and videos (.mp4) play inline. You can also include image "
-        "URLs in markdown format ![alt](url) and they will be sent as native photos."
+        "URLs in markdown format ![alt](url) and they will be sent as native photos. "
+        "You have a personal sticker library on Telegram — see the sticker "
+        "tools (send_sticker, list_my_stickers, add_sticker_to_library, "
+        "add_set_to_library, edit_sticker, remove_from_library) for how to "
+        "manage and use it."
     ),
     "discord": (
         "You are in a Discord server or group chat communicating with your user. "

@@ -313,6 +313,7 @@ class TestBuiltinDiscovery:
             "tools.skill_manager_tool",
             "tools.skills_tool",
             "tools.terminal_tool",
+            "tools.sticker_tools",
             "tools.todo_tool",
             "tools.tts_tool",
             "tools.vision_tools",
