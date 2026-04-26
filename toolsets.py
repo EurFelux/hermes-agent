@@ -330,9 +330,16 @@ TOOLSETS = {
     },
 
     "hermes-telegram": {
-        "description": "Telegram bot toolset - full access for personal use (terminal has safety checks)",
-        "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "description": "Telegram bot toolset - full access for personal use (terminal has safety checks); includes sticker library tools",
+        "tools": _HERMES_CORE_TOOLS + [
+            "send_sticker",
+            "list_my_stickers",
+            "add_sticker_to_library",
+            "add_set_to_library",
+            "edit_sticker",
+            "remove_from_library",
+        ],
+        "includes": [],
     },
     
     "hermes-discord": {
