@@ -2832,8 +2832,22 @@ class TelegramAdapter(BasePlatformAdapter):
         # Check the cache first
         cached = get_cached_description(sticker.file_unique_id)
         if cached:
+            # Partial-hit self-heal: legacy entries lack file_id; backfill without re-running vision.
+            if not cached.get("file_id") and sticker.file_id:
+                cache_sticker_description(
+                    sticker.file_unique_id,
+                    cached["description"],
+                    cached.get("emoji", ""),
+                    cached.get("set_name", ""),
+                    file_id=sticker.file_id,
+                )
+                logger.info(
+                    "[Telegram] Backfilled file_id for legacy cache entry: %s",
+                    sticker.file_unique_id,
+                )
             event.text = build_sticker_injection(
-                cached["description"], cached.get("emoji", emoji), cached.get("set_name", set_name)
+                cached["description"], cached.get("emoji", emoji), cached.get("set_name", set_name),
+                file_unique_id=sticker.file_unique_id,
             )
             logger.info("[Telegram] Sticker cache hit: %s", sticker.file_unique_id)
             return
@@ -2854,19 +2868,27 @@ class TelegramAdapter(BasePlatformAdapter):
 
             if result.get("success"):
                 description = result.get("analysis", "a sticker")
-                cache_sticker_description(sticker.file_unique_id, description, emoji, set_name)
-                event.text = build_sticker_injection(description, emoji, set_name)
+                cache_sticker_description(
+                    sticker.file_unique_id, description, emoji, set_name,
+                    file_id=sticker.file_id,
+                )
+                event.text = build_sticker_injection(
+                    description, emoji, set_name,
+                    file_unique_id=sticker.file_unique_id,
+                )
             else:
                 # Vision failed -- use emoji as fallback
                 event.text = build_sticker_injection(
                     f"a sticker with emoji {emoji}" if emoji else "a sticker",
                     emoji, set_name,
+                    file_unique_id=sticker.file_unique_id,
                 )
         except Exception as e:
             logger.warning("[Telegram] Sticker analysis error: %s", e, exc_info=True)
             event.text = build_sticker_injection(
                 f"a sticker with emoji {emoji}" if emoji else "a sticker",
                 emoji, set_name,
+                file_unique_id=sticker.file_unique_id,
             )
 
     def _reload_dm_topics_from_config(self) -> None:

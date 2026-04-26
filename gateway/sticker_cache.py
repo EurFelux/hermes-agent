@@ -90,12 +90,17 @@ def build_sticker_injection(
     description: str,
     emoji: str = "",
     set_name: str = "",
+    file_unique_id: str = "",
 ) -> str:
     """
     Build the warm-style injection text for a sticker description.
 
     Returns a string like:
-      [The user sent a sticker 😀 from "MyPack"~ It shows: "A cat waving" (=^.w.^=)]
+      [The user sent a sticker 😀 from "MyPack" (id: AgADxyz)~ It shows: "A cat waving" (=^.w.^=)]
+
+    The ``file_unique_id`` is included so the agent can reference the sticker
+    when calling sticker tools (e.g. ``add_sticker_to_library``). It is omitted
+    if not provided, preserving backward-compatible output.
     """
     context = ""
     if set_name and emoji:
@@ -103,7 +108,11 @@ def build_sticker_injection(
     elif emoji:
         context = f" {emoji}"
 
-    return f"[The user sent a sticker{context}~ It shows: \"{description}\" (=^.w.^=)]"
+    id_suffix = f" (id: {file_unique_id})" if file_unique_id else ""
+    return (
+        f"[The user sent a sticker{context}{id_suffix}~ "
+        f"It shows: \"{description}\" (=^.w.^=)]"
+    )
 
 
 def build_animated_sticker_injection(emoji: str = "") -> str:
