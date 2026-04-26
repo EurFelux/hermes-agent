@@ -1,10 +1,9 @@
 """
 Sticker tools — agent-facing operations on the sticker library.
 
-This file will hold six sticker tools — send_sticker, list_my_stickers,
-add_sticker_to_library, add_set_to_library, edit_sticker, remove_from_library
-— that bundle into the hermes-telegram toolset via toolsets.py. They are
-added incrementally across Tasks 5-10; each tool is a self-contained
+Six tools — send_sticker, list_my_stickers, add_sticker_to_library,
+add_set_to_library, edit_sticker, remove_from_library — bundled into the
+hermes-telegram toolset via toolsets.py. Each tool is a self-contained
 section below, registered at module load via registry.register().
 
 Bot/chat resolution: like ``tools/send_message_tool.py``, these tools build a
@@ -19,7 +18,7 @@ import logging
 import os
 from typing import Optional
 
-from tools.registry import registry, tool_error  # noqa: F401 — tool_error used by Tasks 6-10
+from tools.registry import registry
 from gateway.platforms.base import cache_image_from_bytes
 
 logger = logging.getLogger(__name__)
