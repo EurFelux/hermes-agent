@@ -7856,17 +7856,37 @@ class AIAgent:
         return msg
 
     def _needs_kimi_tool_reasoning(self) -> bool:
-        """Return True when the current provider is Kimi / Moonshot thinking mode.
+        """Return True when the current call targets a Kimi / Moonshot
+        thinking-mode model that requires ``reasoning_content`` on every
+        assistant tool-call message.
 
-        Kimi ``/coding`` and Moonshot thinking mode both require
-        ``reasoning_content`` on every assistant tool-call message; omitting
-        it causes the next replay to fail with HTTP 400.
+        Detection looks at provider, base_url hostname, AND
+        (api_mode + model_name).  Pure hostname detection misses
+        anthropic-compatible aggregators (zenmux, etc.) that route
+        ``moonshotai/kimi-*``: the request hits the aggregator
+        hostname rather than ``api.kimi.com``, but the protocol
+        requirement still applies because the body is still
+        anthropic_messages-format with thinking enabled.  OpenAI-wire
+        aggregators (OpenRouter via /v1/chat/completions) intentionally
+        return False — they translate at the gateway and don't enforce
+        the protocol invariant on caller's behalf.
         """
+        model = (self.model or "").lower()
+        api_mode = (getattr(self, "api_mode", "") or "").lower()
         return (
             self.provider in {"kimi-coding", "kimi-coding-cn"}
             or base_url_host_matches(self.base_url, "api.kimi.com")
             or base_url_host_matches(self.base_url, "moonshot.ai")
             or base_url_host_matches(self.base_url, "moonshot.cn")
+            # Anthropic-compatible aggregators (zenmux, /api/anthropic
+            # gateways) routing Kimi/Moonshot still need reasoning_content
+            # on tool-call replay — protocol follows the wire format,
+            # not the hostname.  Skip on OpenAI-wire aggregators where
+            # the gateway absorbs the protocol details.
+            or (
+                api_mode == "anthropic_messages"
+                and ("kimi" in model or "moonshot" in model)
+            )
         )
 
     def _needs_deepseek_tool_reasoning(self) -> bool:
